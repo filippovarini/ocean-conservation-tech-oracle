@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_review.html" import review_form %}
+{% block content %}
+
+  <div class="filters">
+    {% set tabs = [('all', 'All'), ('candidate', 'Pending'),
+                   ('approved', 'Approved'), ('rejected', 'Rejected')] %}
+    {% for key, label in tabs %}
+      <a href="{{ url_for('index', status=key) }}"
+         class="{{ 'active' if active == key else '' }}">
+        {{ label }} <span class="n">{{ counts[key] }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  {% if not techs %}
+    <div class="empty">No technologies{{ ' to review' if active == 'candidate' }} here.</div>
+  {% endif %}
+
+  {% for t in techs %}
+    <div class="card">
+      <h3>
+        <a href="{{ url_for('detail', tech_id=t.id) }}">{{ t.name }}</a>
+        <span class="badge {{ t.status }}">{{ STATUS_LABELS[t.status] }}</span>
+      </h3>
+      {% if t.description %}<div class="desc">{{ t.description }}</div>{% endif %}
+
+      {% if t.modalities or t.functions %}
+        <div class="chips">
+          {% for m in t.modalities %}<span class="chip">{{ m | facet }}</span>{% endfor %}
+          {% for f in t.functions %}<span class="chip">{{ f | facet }}</span>{% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="meta">
+        #{{ t.id }} ·
+        {{ t.maturity | facet if t.maturity else 'maturity ?' }} ·
+        {{ t.openness | facet if t.openness else 'openness ?' }} ·
+        {{ t.n_evidence }} evidence
+        {% if t.homepage_url %} · <a href="{{ t.homepage_url }}" target="_blank" rel="noopener">homepage ↗</a>{% endif %}
+      </div>
+
+      {{ review_form(t, url_for('index', status=active)) }}
+    </div>
+  {% endfor %}
+
+{% endblock %}

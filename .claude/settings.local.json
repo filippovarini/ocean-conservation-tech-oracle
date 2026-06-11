@@ -21,7 +21,9 @@
       "Bash(git --version)",
       "Bash(sudo -n true)",
       "Bash(sudo apt-get update -qq)",
-      "Bash(sudo apt-get install -y -qq git)"
+      "Bash(sudo apt-get install -y -qq git)",
+      "Bash(.venv/bin/python -c \"import flask; print\\('flask', flask.__version__\\)\")",
+      "Bash(.venv/bin/python -c \"import sqlite3; c=sqlite3.connect\\('catalog.db'\\); print\\('rows:', c.execute\\('select count\\(*\\), group_concat\\(distinct status\\) from technology'\\).fetchone\\(\\)\\)\")"
     ]
   }
 }

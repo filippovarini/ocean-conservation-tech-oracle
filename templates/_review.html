@@ -1,0 +1,14 @@
+{% macro review_form(tech, next_url) %}
+  <form class="actions" method="post" action="{{ url_for('review', tech_id=tech.id) }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    {% if tech.status != 'approved' %}
+      <button class="btn approve" name="action" value="approve">✓ Approve</button>
+    {% endif %}
+    {% if tech.status != 'rejected' %}
+      <button class="btn reject" name="action" value="reject">✕ Reject</button>
+    {% endif %}
+    {% if tech.status != 'candidate' %}
+      <button class="btn" name="action" value="reset">↺ Reset to pending</button>
+    {% endif %}
+  </form>
+{% endmacro %}

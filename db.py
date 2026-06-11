@@ -168,6 +168,62 @@ def add_identifiers(conn, technology_id, identifiers):
         )
 
 
+# --- review workflow + read helpers (frontend) -----------------------------
+
+# Review states. `candidate` is the schema default, i.e. "pending review".
+PENDING, APPROVED, REJECTED = "candidate", "approved", "rejected"
+REVIEW_STATES = (PENDING, APPROVED, REJECTED)
+
+
+def set_status(conn, technology_id, status):
+    """Set a technology's review status. Raises ValueError on unknown status."""
+    if status not in REVIEW_STATES:
+        raise ValueError(f"unknown status: {status!r}")
+    conn.execute(
+        "UPDATE technology SET status=?, updated_at=datetime('now') WHERE id=?",
+        (status, technology_id),
+    )
+    conn.commit()
+
+
+def status_counts(conn):
+    """Return {status: count} plus 'all', for filter badges."""
+    counts = {s: 0 for s in REVIEW_STATES}
+    total = 0
+    for row in conn.execute("SELECT status, COUNT(*) AS n FROM technology GROUP BY status"):
+        counts[row["status"]] = row["n"]
+        total += row["n"]
+    counts["all"] = total
+    return counts
+
+
+def list_technologies(conn, status=None):
+    """Technologies (with evidence counts), newest first. Optionally filter by status."""
+    sql = (
+        "SELECT t.*, COUNT(e.id) AS n_evidence "
+        "FROM technology t LEFT JOIN evidence e ON e.technology_id = t.id "
+    )
+    params = ()
+    if status:
+        sql += "WHERE t.status = ? "
+        params = (status,)
+    sql += "GROUP BY t.id ORDER BY t.updated_at DESC"
+    return conn.execute(sql, params).fetchall()
+
+
+def get_technology(conn, technology_id):
+    return conn.execute(
+        "SELECT * FROM technology WHERE id=?", (technology_id,)
+    ).fetchone()
+
+
+def get_evidence(conn, technology_id):
+    return conn.execute(
+        "SELECT * FROM evidence WHERE technology_id=? ORDER BY published_date DESC",
+        (technology_id,),
+    ).fetchall()
+
+
 def add_evidence(conn, technology_id, ev):
     conn.execute(
         """INSERT INTO evidence

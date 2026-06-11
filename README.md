@@ -37,8 +37,10 @@ OpenAlex  ->  pre-filter  ->  gate + extract (LLM)  ->  dedup  ->  SQLite
 | `taxonomy.py` | Controlled vocabulary (the facets). Edit to grow the taxonomy.|
 | `sources.py`  | OpenAlex connector. Add more sources here later.              |
 | `llm.py`      | The single gate+extract LLM call (Anthropic).                 |
-| `db.py`       | SQLite schema + dedup/write helpers.                          |
+| `db.py`       | SQLite schema + dedup/write/read helpers.                     |
 | `ingest.py`   | Orchestrator + `list` viewer (CLI entry point).               |
+| `app.py`      | Flask review UI (visualise + approve/reject technologies).     |
+| `templates/`  | Server-rendered HTML for the review UI.                        |
 
 ## Setup
 
@@ -66,9 +68,27 @@ python ingest.py run
 # tune the window / volume / search
 python ingest.py run --days 14 --limit 50 --query "coral reef monitoring"
 
-# view the catalog
+# view the catalog (CLI)
 python ingest.py list
 ```
+
+### Review UI
+
+A small Flask app lets you browse the catalog and approve/reject each
+technology. Review state reuses the existing `technology.status` column:
+`candidate` (the default = **pending review**) → `approved` / `rejected`.
+
+```bash
+python app.py          # serves http://127.0.0.1:5000
+```
+
+- The list view filters by status (All / Pending / Approved / Rejected) with
+  live counts, shows each tech's facets and evidence count, and has
+  approve/reject buttons inline.
+- Click a technology for the detail view: full facets plus every evidence row
+  (paper/post title, link, DOI, date).
+- It reads and writes the same `catalog.db` the pipeline uses — no separate
+  store — so reviewing while a run is in progress just works.
 
 A run prints a summary: how many works were fetched, skipped (already seen),
 pre-filtered, rejected by the gate, attached to existing tech, or created new.
@@ -105,12 +125,16 @@ What this POC does **not** do yet, and why each was left out:
 - **No full-text fetch.** We classify on title + abstract only. Fetching the
   paper body / repo README before extraction is the biggest recall win to add,
   since many tools are only named in the body.
-- **No human review queue.** Extracted records are written straight to the
-  catalog as `candidate`. A review/approval step (and a `published` gate before
-  anything reaches a feed) is needed before this is trustworthy.
+- **Human review queue: basic version built.** Extracted records still land as
+  `candidate`, but the Flask review UI (`app.py`) now lets a human approve or
+  reject each one. Not yet built: bulk actions, reviewer identity/audit trail,
+  inline editing of extracted facets, and gating any downstream feed on
+  `approved`.
 - **No scoring or digest/newsletter.** Novelty × relevance × credibility ranking
   and the weekly digest are not built.
-- **No frontend.** Viewing is the `ingest.py list` CLI only.
+- **Frontend: review UI built; no public-facing frontend.** `app.py` provides a
+  reviewer-facing UI (list/filter/detail + approve/reject). A polished
+  public/consumer frontend and the weekly digest are still out of scope.
 - **No scheduling.** Run manually; cron/automation comes once precision is tuned.
 - **Minimal error handling.** Single-shot HTTP, no retries/backoff, no rate-limit
   handling, no structured logging.

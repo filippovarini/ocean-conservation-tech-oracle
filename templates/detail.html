@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_review.html" import review_form %}
+{% block title %}{{ tech.name }} — Ocean-Tech Catalog{% endblock %}
+{% block content %}
+
+  <p><a href="{{ url_for('index') }}">← Back to review queue</a></p>
+
+  <div class="card">
+    <h3>
+      {{ tech.name }}
+      <span class="badge {{ tech.status }}">{{ STATUS_LABELS[tech.status] }}</span>
+    </h3>
+    {% if tech.description %}<div class="desc">{{ tech.description }}</div>{% endif %}
+
+    <div class="meta">
+      #{{ tech.id }}
+      {% if tech.homepage_url %} · <a href="{{ tech.homepage_url }}" target="_blank" rel="noopener">{{ tech.homepage_url }} ↗</a>{% endif %}
+      · updated {{ tech.updated_at }}
+    </div>
+
+    {% set facets = [('Modalities', tech.modalities), ('Functions', tech.functions),
+                     ('Habitats', tech.habitats), ('Taxa', tech.taxa),
+                     ('Free tags', tech.free_tags)] %}
+    {% for label, vals in facets %}
+      {% if vals %}
+        <div class="facet-row">
+          <div class="label">{{ label }}</div>
+          <div class="chips">
+            {% for v in vals %}<span class="chip">{{ v | facet }}</span>{% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="facet-row">
+      <div class="label">Maturity / Openness</div>
+      <div>{{ tech.maturity | facet if tech.maturity else '—' }}
+        / {{ tech.openness | facet if tech.openness else '—' }}</div>
+    </div>
+
+    {{ review_form(tech, url_for('detail', tech_id=tech.id)) }}
+  </div>
+
+  <h3 style="margin:24px 0 8px;">Evidence ({{ evidence | length }})</h3>
+  {% if not evidence %}
+    <p class="meta">No evidence rows.</p>
+  {% else %}
+    <div class="card" style="padding:4px 6px;">
+      <table class="evi">
+        {% for e in evidence %}
+          <tr>
+            <td>
+              {% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.title or e.external_id }}</a>
+              {% else %}{{ e.title or e.external_id }}{% endif %}
+              {% if e.snippet %}<div class="meta">{{ e.snippet }}</div>{% endif %}
+              <div class="meta">
+                {{ e.source_type }}{% if e.doi %} · doi:{{ e.doi }}{% endif %}
+              </div>
+            </td>
+            <td class="pub">{{ e.published_date or '' }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+  {% endif %}
+
+{% endblock %}
