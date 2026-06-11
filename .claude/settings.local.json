@@ -28,7 +28,10 @@
       "Bash(sqlite3 catalog.db \"SELECT id, name, homepage_url FROM technology LIMIT 12;\")",
       "Bash(.venv/bin/python -c \"import app\")",
       "Bash(.venv/bin/python -)",
-      "Bash(ps -eo pid,ppid,etime,cmd)"
+      "Bash(ps -eo pid,ppid,etime,cmd)",
+      "Bash(gcloud config *)",
+      "Bash(chmod +x /home/fvarini/marine-technology-inventory/run_daily.sh)",
+      "Bash(timedatectl)"
     ]
   }
 }
