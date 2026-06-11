@@ -13,6 +13,7 @@ Run:  python app.py            (then open http://127.0.0.1:5000)
 """
 
 import json
+from urllib.parse import urlparse
 
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 
@@ -31,6 +32,9 @@ STATUS_LABELS = {db.PENDING: "Pending", db.APPROVED: "Approved", db.REJECTED: "R
 # Pretty labels for facet vocab keys, e.g. "optical_imagery" -> "Optical imagery".
 _FACET_LABEL = lambda v: v.replace("_", " ").capitalize()
 
+# Readable label for an evidence source_type, e.g. "openalex" -> "OpenAlex".
+SOURCE_LABELS = {"openalex": "OpenAlex"}
+
 
 def _row_to_tech(row):
     """sqlite Row -> dict with JSON facet columns parsed into lists."""
@@ -43,6 +47,24 @@ def _row_to_tech(row):
 @app.template_filter("facet")
 def facet_filter(value):
     return _FACET_LABEL(value)
+
+
+@app.template_filter("source")
+def source_filter(value):
+    return SOURCE_LABELS.get(value, (value or "").replace("_", " ").title())
+
+
+@app.template_filter("host")
+def host_filter(url):
+    """Bare hostname of a URL, e.g. 'https://doi.org/10.x' -> 'doi.org'.
+
+    Lets a source link advertise what kind of resource it points to
+    (doi.org, github.com, a journal site) without showing the full URL.
+    """
+    if not url:
+        return ""
+    netloc = urlparse(url).netloc
+    return netloc[4:] if netloc.startswith("www.") else netloc
 
 
 @app.context_processor

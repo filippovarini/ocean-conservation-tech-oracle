@@ -198,9 +198,17 @@ def status_counts(conn):
 
 
 def list_technologies(conn, status=None):
-    """Technologies (with evidence counts), newest first. Optionally filter by status."""
+    """Technologies (with evidence counts), newest first. Optionally filter by status.
+
+    Also surfaces a representative "primary source" (the most recent evidence
+    URL/title) so the list view can link straight to the original resource.
+    """
     sql = (
-        "SELECT t.*, COUNT(e.id) AS n_evidence "
+        "SELECT t.*, COUNT(e.id) AS n_evidence, "
+        "  (SELECT url   FROM evidence WHERE technology_id = t.id "
+        "     ORDER BY published_date DESC, id DESC LIMIT 1) AS primary_source_url, "
+        "  (SELECT title FROM evidence WHERE technology_id = t.id "
+        "     ORDER BY published_date DESC, id DESC LIMIT 1) AS primary_source_title "
         "FROM technology t LEFT JOIN evidence e ON e.technology_id = t.id "
     )
     params = ()

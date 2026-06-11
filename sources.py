@@ -35,6 +35,34 @@ def _reconstruct_abstract(inverted_index):
     return " ".join(positions[i] for i in sorted(positions))
 
 
+def _best_url(w):
+    """Pick the most accessible landing page for a work.
+
+    Tuned for practitioners, not researchers: prefer an open-access landing
+    page (free full text), then a real journal/publisher/repository page, and
+    only fall back to the bare doi.org resolver or the OpenAlex record when
+    nothing friendlier exists. OpenAlex returns the abstract-bearing work
+    object by default, so best_oa_location / primary_location / locations are
+    all present.
+    """
+    # Priority order of where to look for a landing page.
+    candidates = []
+    for loc in (w.get("best_oa_location"), w.get("primary_location")):
+        candidates.append((loc or {}).get("landing_page_url"))
+    for loc in w.get("locations") or []:
+        candidates.append((loc or {}).get("landing_page_url"))
+
+    # First pass: a "clean" page that isn't just a DOI/OpenAlex redirect.
+    for url in candidates:
+        if url and "doi.org" not in url and "openalex.org" not in url:
+            return url
+    # Otherwise the best landing page we have, then DOI, then the record id.
+    for url in candidates:
+        if url:
+            return url
+    return w.get("doi") or w.get("id")
+
+
 def fetch_openalex(query=DEFAULT_QUERY, days=7, limit=25):
     """Yield recent works as dicts: external_id, doi, url, title, abstract, published_date."""
     since = (date.today() - timedelta(days=days)).isoformat()
@@ -50,12 +78,11 @@ def fetch_openalex(query=DEFAULT_QUERY, days=7, limit=25):
         data = json.load(resp)
 
     for w in data.get("results", [])[:limit]:
-        loc = w.get("primary_location") or {}
         yield {
             "source_type": "openalex",
             "external_id": w.get("id", ""),          # e.g. https://openalex.org/W123
             "doi": w.get("doi"),
-            "url": loc.get("landing_page_url") or w.get("id"),
+            "url": _best_url(w),
             "title": w.get("display_name") or "",
             "abstract": _reconstruct_abstract(w.get("abstract_inverted_index")),
             "published_date": w.get("publication_date"),

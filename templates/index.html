@@ -36,9 +36,15 @@
         #{{ t.id }} ·
         {{ t.maturity | facet if t.maturity else 'maturity ?' }} ·
         {{ t.openness | facet if t.openness else 'openness ?' }} ·
-        {{ t.n_evidence }} evidence
-        {% if t.homepage_url %} · <a href="{{ t.homepage_url }}" target="_blank" rel="noopener">homepage ↗</a>{% endif %}
+        {{ t.n_evidence }} {{ 'source' if t.n_evidence == 1 else 'sources' }}
+        {% if t.homepage_url %} · <a href="{{ t.homepage_url }}" target="_blank" rel="noopener">website ↗</a>{% endif %}
       </div>
+
+      {% if t.primary_source_url %}
+        <div class="meta" style="margin-top:4px;">
+          Source: <a href="{{ t.primary_source_url }}" target="_blank" rel="noopener">{{ t.primary_source_title or t.primary_source_url }} ↗</a>
+        </div>
+      {% endif %}
 
       {{ review_form(t, url_for('index', status=active)) }}
     </div>

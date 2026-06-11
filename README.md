@@ -1,140 +1,85 @@
-# Ocean-Tech Catalog — Phase 1 POC
+# Ocean-Tech Catalog
 
-An automated pipeline that discovers technologies useful for **ocean
-conservation** and builds a structured catalog. Phase 1 ingests recent academic
-works from [OpenAlex](https://openalex.org), uses one LLM call per item to decide
-"is this a usable tool, and is it ocean-relevant?" and to extract structured
-attributes, deduplicates against what's already stored, and writes to SQLite.
+A tool that automatically discovers technologies useful for **ocean**  
+**conservation** and organizes them into a searchable, reviewable catalog.
 
-This is a deliberately small proof of concept. The richer Postgres + pgvector
-design from planning is the migration target, not this — see **Deferred to
-Phase 2** below for everything intentionally left out.
+## What you can do with it
 
-## Pipeline
-
-```
-OpenAlex  ->  pre-filter  ->  gate + extract (LLM)  ->  dedup  ->  SQLite
- (free,      (loose regex,    (Haiku, one call,        (identifier  (catalog.db)
-  no key)     skips obvious    forced tool call for     -> fuzzy
-              non-tool text)   valid JSON)              name -> new)
-```
-
-- **Pre-filter** is loose on purpose: it only drops works with zero tool/method
-  signal, to avoid paying for an LLM call on obvious noise. The LLM gate is the
-  real precision arbiter.
-- **Gate + extract** is a single Haiku call. It returns `is_technology` and
-  `ocean_relevant` flags plus the structured fields; we keep the fields only
-  when both flags are true.
-- **Dedup waterfall**: strong identifier (GitHub repo / homepage) → fuzzy name
-  match → otherwise create a new technology. No embeddings yet.
-- **`seen_work`** records every fetched item (kept or rejected) so a re-run
-  never re-processes — or re-pays the LLM for — the same source item.
-
-## Files
-
-| File          | Role                                                          |
-|---------------|---------------------------------------------------------------|
-| `taxonomy.py` | Controlled vocabulary (the facets). Edit to grow the taxonomy.|
-| `sources.py`  | OpenAlex connector. Add more sources here later.              |
-| `llm.py`      | The single gate+extract LLM call (Anthropic).                 |
-| `db.py`       | SQLite schema + dedup/write/read helpers.                     |
-| `ingest.py`   | Orchestrator + `list` viewer (CLI entry point).               |
-| `app.py`      | Flask review UI (visualise + approve/reject technologies).     |
-| `templates/`  | Server-rendered HTML for the review UI.                        |
+- **Build a catalog** of ocean conservation technologies from recent research.
+- **Browse and search** them by what they do, their maturity, and openness.
+- **Review** each entry — approve the useful ones, reject the rest — in a simple
+web interface.
+- **Trace every entry** back to its original source (paper, dataset, or
+repository), with links chosen to be as accessible as possible.
 
 ## Setup
+
+You'll need an [Anthropic API key](https://console.anthropic.com/) (used to
+classify and tag each technology).
 
 ```bash
 cd marine-technology-inventory
 python3 -m venv .venv
 source .venv/bin/activate
-python -m ensurepip --upgrade        # this box has no system pip
+python -m ensurepip --upgrade        # only if this machine has no pip
 pip install -r requirements.txt
 
-# create your .env (git-ignored) from the template and add your key
+# create your .env from the template and add your key
 cp .env.example .env
 # then edit .env:  ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-The pipeline loads `.env` automatically (via `python-dotenv`), so no `export`
-is needed. Any environment variable already set still takes precedence.
+Your key is loaded automatically — no `export` needed.
 
-## Usage
+## Building the catalog
 
 ```bash
-# fetch the last 7 days of works (max 25), classify, and store
+# discover technologies from the last 7 days of research
 python ingest.py run
 
-# tune the window / volume / search
+# widen the window, pull more, or focus the search
 python ingest.py run --days 14 --limit 50 --query "coral reef monitoring"
 
-# view the catalog (CLI)
+# list what's in the catalog from the command line
 python ingest.py list
 ```
 
-### Review UI
+Each run prints a short summary of how many technologies it found and added.
+You can run it as often as you like — it remembers what it has already seen, so
+re-running won't create duplicates.
 
-A small Flask app lets you browse the catalog and approve/reject each
-technology. Review state reuses the existing `technology.status` column:
-`candidate` (the default = **pending review**) → `approved` / `rejected`.
+## Reviewing in the browser
+
+A built-in web app lets you browse the catalog and approve or reject each
+technology.
 
 ```bash
-python app.py          # serves http://127.0.0.1:5000
+python app.py          # then open http://127.0.0.1:5000
 ```
 
-- The list view filters by status (All / Pending / Approved / Rejected) with
-  live counts, shows each tech's facets and evidence count, and has
-  approve/reject buttons inline.
-- Click a technology for the detail view: full facets plus every evidence row
-  (paper/post title, link, DOI, date).
-- It reads and writes the same `catalog.db` the pipeline uses — no separate
-  store — so reviewing while a run is in progress just works.
+- **List view** — filter by status (All / Pending / Approved / Rejected),
+see each technology's tags at a glance, and approve or reject without leaving
+the page. Each card links straight to its original source.
+- **Detail view** — the full description and tags, the technology's website if
+it has one, and every **Source** (papers, datasets, and references it was
+found in) with direct links.
 
-A run prints a summary: how many works were fetched, skipped (already seen),
-pre-filtered, rejected by the gate, attached to existing tech, or created new.
+New technologies start as **Pending**. Approve the ones worth keeping; reject
+the rest. The catalog and the review app share the same data, so you can review
+while a run is in progress.
 
-## Design notes
+## Sources to Include
 
-- **Facets** are stored as JSON arrays in text columns, not normalized junction
-  tables — adequate at POC scale and queryable via `json_each()`.
-- **Vocabulary is the source of truth**: the LLM prompt is built from
-  `taxonomy.py`, so adding a key there makes the extractor start using it on the
-  next run. Values the model invents outside the vocab are demoted to
-  `free_tags` (a signal that a term may be worth promoting).
-- **Cost control** is `seen_work` + the loose pre-filter. Without them a daily
-  cron would re-classify the whole lookback window every morning.
+- [x] **OpenAlex** for scientific papers
+- [ ] GitHub for software
+- [ ] BlueSky for posts
+- [ ] OCTO Newsletter
+- [ ] Other newsletters (to find)
 
----
+## Tips
 
-## Deferred to Phase 2 (intentionally out of scope)
+- Start with a broad run to populate the catalog, then narrow `--query` to focus
+on a topic you care about (e.g. `"eDNA"`, `"bioacoustics"`, `"MPA enforcement"`).
+- If a page won't load at `http://localhost:5000`, try `http://127.0.0.1:5000`
+directly (some networks block `localhost`).
 
-What this POC does **not** do yet, and why each was left out:
-
-- **LLM choice not yet decided.** We hard-code Haiku 4.5 for the gate+extract
-  call to get something running. Before scaling, deliberately choose the
-  model(s): evaluate accuracy vs. cost on a labelled sample, and consider
-  splitting into a *cheap gate* + *stronger extractor* once volume justifies it.
-- **No Postgres / pgvector.** SQLite only. No semantic (embedding-based) dedup
-  or intent search ("I have BRUVS footage and no time") — dedup is identifier +
-  fuzzy name only, which will miss some duplicates.
-- **One source only.** OpenAlex. arXiv, bioRxiv, Crossref, GitHub, Zenodo,
-  Hugging Face, and Bluesky are all planned but not built. X/Twitter and
-  LinkedIn remain out (cost / ToS).
-- **WildLabs inventory not ingested.** Pending them sharing the dataset; it will
-  enter as another evidence source + identifier type, no schema change needed.
-- **No full-text fetch.** We classify on title + abstract only. Fetching the
-  paper body / repo README before extraction is the biggest recall win to add,
-  since many tools are only named in the body.
-- **Human review queue: basic version built.** Extracted records still land as
-  `candidate`, but the Flask review UI (`app.py`) now lets a human approve or
-  reject each one. Not yet built: bulk actions, reviewer identity/audit trail,
-  inline editing of extracted facets, and gating any downstream feed on
-  `approved`.
-- **No scoring or digest/newsletter.** Novelty × relevance × credibility ranking
-  and the weekly digest are not built.
-- **Frontend: review UI built; no public-facing frontend.** `app.py` provides a
-  reviewer-facing UI (list/filter/detail + approve/reject). A polished
-  public/consumer frontend and the weekly digest are still out of scope.
-- **No scheduling.** Run manually; cron/automation comes once precision is tuned.
-- **Minimal error handling.** Single-shot HTTP, no retries/backoff, no rate-limit
-  handling, no structured logging.

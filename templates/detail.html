@@ -13,10 +13,15 @@
     {% if tech.description %}<div class="desc">{{ tech.description }}</div>{% endif %}
 
     <div class="meta">
-      #{{ tech.id }}
-      {% if tech.homepage_url %} · <a href="{{ tech.homepage_url }}" target="_blank" rel="noopener">{{ tech.homepage_url }} ↗</a>{% endif %}
-      · updated {{ tech.updated_at }}
+      #{{ tech.id }} · updated {{ tech.updated_at }}
     </div>
+
+    {% if tech.homepage_url %}
+      <div class="facet-row">
+        <div class="label">Website</div>
+        <div><a href="{{ tech.homepage_url }}" target="_blank" rel="noopener">{{ tech.homepage_url }} ↗</a></div>
+      </div>
+    {% endif %}
 
     {% set facets = [('Modalities', tech.modalities), ('Functions', tech.functions),
                      ('Habitats', tech.habitats), ('Taxa', tech.taxa),
@@ -41,20 +46,26 @@
     {{ review_form(tech, url_for('detail', tech_id=tech.id)) }}
   </div>
 
-  <h3 style="margin:24px 0 8px;">Evidence ({{ evidence | length }})</h3>
+  <h3 style="margin:24px 0 2px;">Sources ({{ evidence | length }})</h3>
+  <p class="meta" style="margin:0 0 8px;">
+    The original papers, datasets, and references this technology was found in. Follow a link to read the source.
+  </p>
   {% if not evidence %}
-    <p class="meta">No evidence rows.</p>
+    <p class="meta">No sources recorded.</p>
   {% else %}
     <div class="card" style="padding:4px 6px;">
       <table class="evi">
         {% for e in evidence %}
+          {% set link = e.url or e.doi %}
           <tr>
             <td>
-              {% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.title or e.external_id }}</a>
+              {% if link %}<a href="{{ link }}" target="_blank" rel="noopener">{{ e.title or e.external_id }} ↗</a>
               {% else %}{{ e.title or e.external_id }}{% endif %}
               {% if e.snippet %}<div class="meta">{{ e.snippet }}</div>{% endif %}
-              <div class="meta">
-                {{ e.source_type }}{% if e.doi %} · doi:{{ e.doi }}{% endif %}
+              <div class="meta src-links">
+                <span class="chip">{{ e.source_type | source }}</span>
+                {% if link %}<a href="{{ link }}" target="_blank" rel="noopener">{{ link | host }} ↗</a>{% endif %}
+                {% if e.doi and e.doi != e.url %} · <a href="{{ e.doi }}" target="_blank" rel="noopener">DOI ↗</a>{% endif %}
               </div>
             </td>
             <td class="pub">{{ e.published_date or '' }}</td>
